@@ -1,0 +1,5 @@
+{
+  "name": "Calculadora de Calhas e Dutos",
+  "description": "Um aplicativo completo para calcular e dimensionar calhas e dutos de descida de água pluvial com base nas normas técnicas brasileiras. Inclui também um editor de imagens com IA para edições criativas usando prompts de texto.",
+  "requestFramePermissions": []
+}
