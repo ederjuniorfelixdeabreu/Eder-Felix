@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calculadora de Calhas</title>
+<style>
+:root{
+  --bg:#f3f5f8; --card:#ffffff; --ink:#1b2430; --muted:#5d6b7c; --line:#d9dfe7;
+  --accent:#0b5cad; --accent-2:#e8f1fb; --ok:#1f7a3d; --warn:#9a5b00; --warn-bg:#fff6e5;
+  --bad:#b3261e; --water:#9cc9f0; --sheet:#2b3a4a; --dim:#0b5cad;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 "Segoe UI",Roboto,Arial,sans-serif}
+header{background:#12324f;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+header h1{font-size:18px;margin:0;font-weight:600}
+header .sub{font-size:12px;opacity:.8}
+#status{margin-left:auto;font-size:12px;padding:4px 10px;border-radius:12px;background:#ffffff22}
+main{display:grid;grid-template-columns:minmax(300px,420px) 1fr;gap:16px;padding:16px;max-width:1500px;margin:0 auto}
+@media (max-width:900px){main{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-bottom:14px}
+.card h2{font-size:14px;margin:0 0 10px;color:var(--accent);text-transform:uppercase;letter-spacing:.04em}
+.card h3{font-size:13px;margin:14px 0 6px}
+label{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px}
+input,select{width:100%;padding:7px 8px;border:1px solid var(--line);border-radius:5px;font:inherit;background:#fff;color:var(--ink)}
+input:focus,select:focus{outline:2px solid #0b5cad55;border-color:var(--accent)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.hint{font-size:11px;color:var(--muted);margin-top:2px}
+details{margin-top:8px}
+summary{cursor:pointer;color:var(--accent);font-size:13px}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+button{border:0;border-radius:6px;padding:9px 14px;font:600 13px inherit;font-family:inherit;cursor:pointer;background:var(--accent);color:#fff}
+button.sec{background:#e3e9f1;color:var(--ink)}
+button:disabled{opacity:.5;cursor:wait}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.kpi{background:var(--accent-2);border-radius:6px;padding:10px}
+.kpi .v{font-size:20px;font-weight:700;color:#0a3f78}
+.kpi .l{font-size:11px;color:var(--muted)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left;vertical-align:top}
+th{background:#f0f3f7;font-weight:600}
+td.n{text-align:right;white-space:nowrap}
+.warn{background:var(--warn-bg);border-left:4px solid var(--warn);padding:8px 10px;margin:6px 0;font-size:13px}
+.ok{color:var(--ok);font-weight:600}.bad{color:var(--bad);font-weight:600}
+.drawing{width:100%;background:#fff;border:1px solid var(--line);border-radius:6px}
+.mem{font-family:Consolas,"Courier New",monospace;font-size:12px;background:#f7f9fb;border:1px solid var(--line);border-radius:6px;padding:10px;white-space:pre-wrap}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:1200px){.grid2{grid-template-columns:1fr}}
+#vazio{color:var(--muted);text-align:center;padding:60px 10px}
+footer{font-size:11px;color:var(--muted);text-align:center;padding:10px 16px 24px}
+@media print{header,#form,footer,.btns{display:none!important} main{display:block;padding:0} .card{break-inside:avoid;border:0}}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Calculadora de Calhas e Condutores Pluviais</h1>
+    <div class="sub">NBR 10844:1989 · Manning-Strickler · PVC NBR 5688 · cálculo em Python (Brython, offline)</div>
+  </div>
+  <span id="status">Carregando motor Python…</span>
+</header>
+
+<main>
+<section id="form">
+  <div class="card">
+    <h2>1. Local e chuva</h2>
+    <div class="row">
+      <div><label for="uf">Estado (UF)</label><select id="uf"></select></div>
+      <div><label for="cidade">Cidade</label><select id="cidade"></select></div>
+    </div>
+    <label for="T">Período de retorno (T)</label>
+    <select id="T">
+      <option value="1">T = 1 ano — áreas pavimentadas onde empoçamentos possam ser tolerados</option>
+      <option value="5" selected>T = 5 anos — coberturas e/ou terraços</option>
+      <option value="25">T = 25 anos — coberturas onde empoçamento/extravasamento não possa ser tolerado</option>
+    </select>
+    <div id="chuvaInfo" class="hint"></div>
+    <details>
+      <summary>Coordenadas / intensidade manual</summary>
+      <div class="row">
+        <div><label for="lat">Latitude (opcional)</label><input id="lat" type="number" step="0.0001" placeholder="ex.: -22.9"></div>
+        <div><label for="lon">Longitude (opcional)</label><input id="lon" type="number" step="0.0001" placeholder="ex.: -47.06"></div>
+      </div>
+      <div class="hint">Informe as coordenadas para localizar o posto da NBR 10844 mais próximo de uma cidade fora da lista.</div>
+      <label for="Iman">Intensidade pluviométrica manual I (mm/h)</label>
+      <input id="Iman" type="number" step="1" min="0" placeholder="deixe vazio para usar a NBR 10844">
+      <div class="hint">Use para equação IDF local (ex.: DAEE-SP, prefeituras, CPRM/SGB) com duração de 5 min.</div>
+    </details>
+  </div>
+
+  <div class="card">
+    <h2>2. Cobertura</h2>
+    <label for="naguas">Águas que contribuem para a calha</label>
+    <select id="naguas"><option value="1">1 água</option><option value="2">2 águas</option></select>
+    <div class="row">
+      <div><label for="a1">Largura da água 1 — projeção horizontal (m)</label><input id="a1" type="number" step="0.01" value="6"></div>
+      <div><label for="a2">Largura da água 2 — projeção horizontal (m)</label><input id="a2" type="number" step="0.01" value="6" disabled></div>
+    </div>
+    <div class="row">
+      <div><label for="comp">Comprimento da cobertura / calha (m)</label><input id="comp" type="number" step="0.01" value="12"></div>
+      <div><label for="inc">Inclinação do telhado (%)</label><input id="inc" type="number" step="0.5" value="30"></div>
+    </div>
+    <label for="parede">Área de parede vertical contribuinte (m²)</label>
+    <input id="parede" type="number" step="0.1" value="0">
+    <div class="hint">Largura = distância horizontal do beiral à cumeeira, perpendicular à calha.</div>
+  </div>
+
+  <div class="card">
+    <h2>3. Calha</h2>
+    <div class="row">
+      <div><label for="forma">Formato</label>
+        <select id="forma">
+          <option value="beiral">Beiral — 1 água</option>
+          <option value="central">Central / água-furtada — 2 águas</option>
+          <option value="retangular">Retangular (platibanda)</option>
+          <option value="meiacana">Meia-cana (semicircular)</option>
+        </select></div>
+      <div><label for="material">Material</label>
+        <select id="material">
+          <option value="galvanizada">Chapa galvanizada (n = 0,011)</option>
+          <option value="aluminio">Chapa de alumínio (n = 0,011)</option>
+          <option value="cobre">Chapa de cobre (n = 0,011)</option>
+          <option value="inox">Chapa de aço inox (n = 0,011)</option>
+          <option value="pvc">PVC (n = 0,011)</option>
+          <option value="fibrocimento">Fibrocimento (n = 0,011)</option>
+          <option value="concreto_alisado">Concreto alisado (n = 0,012)</option>
+          <option value="alvenaria_revestida">Alvenaria revestida (n = 0,012)</option>
+          <option value="concreto">Concreto não alisado (n = 0,013)</option>
+          <option value="ceramica">Cerâmica (n = 0,013)</option>
+          <option value="alvenaria">Alvenaria de tijolos não revestida (n = 0,015)</option>
+        </select></div>
+    </div>
+    <div class="row">
+      <div><label for="decl">Declividade da calha (%)</label><input id="decl" type="number" step="0.1" min="0.5" value="0.5"></div>
+      <div><label for="curva">Curvas próximas à saída</label>
+        <select id="curva">
+          <option value="nenhuma">Nenhuma (×1,00)</option>
+          <option value="reto_2">Canto reto &lt; 2 m (×1,20)</option>
+          <option value="arred_2">Canto arredondado &lt; 2 m (×1,10)</option>
+          <option value="reto_4">Canto reto 2–4 m (×1,10)</option>
+          <option value="arred_4">Canto arredondado 2–4 m (×1,05)</option>
+        </select></div>
+    </div>
+    <details id="detChapa" open>
+      <summary>Dobras e corte da chapa</summary>
+      <div class="row">
+        <div><label for="lchapa">Largura da chapa (mm)</label><input id="lchapa" type="number" value="1200"></div>
+        <div><label for="cchapa">Comprimento da chapa (mm)</label>
+          <select id="cchapa"><option>2000</option><option selected>3000</option></select></div>
+      </div>
+      <div class="row3">
+        <div><label for="aba">Aba de fixação (mm)</label><input id="aba" type="number" value="100"></div>
+        <div><label for="bainha">Bainha (mm)</label><input id="bainha" type="number" value="15"></div>
+        <div><label for="sobre">Sobrealtura traseira (mm)</label><input id="sobre" type="number" value="20"></div>
+      </div>
+      <div class="row">
+        <div><label for="otim">Otimizar corte (1200/k)</label>
+          <select id="otim"><option value="1">Sim — tira sem sobra</option><option value="0">Não — desenvolvimento mínimo</option></select></div>
+        <div><label for="acresc">Acréscimo máx. de material (%)</label><input id="acresc" type="number" value="30"></div>
+      </div>
+      <div class="hint">Tiras sem sobra em chapa de 1200 mm: 1200, 600, 400, 300, 240, 200 mm… O programa ajusta largura e altura da calha para fechar a medida.</div>
+    </details>
+  </div>
+
+  <div class="card">
+    <h2>4. Condutores de descida</h2>
+    <div class="row">
+      <div><label for="N">Quantidade de descidas</label><input id="N" type="number" min="1" step="1" value="2"></div>
+      <div><label for="hcond">Altura do condutor (m)</label><input id="hcond" type="number" step="0.1" value="3"></div>
+    </div>
+    <div class="row">
+      <div><label for="fluxo">Posição das descidas</label>
+        <select id="fluxo">
+          <option value="uni">Nas extremidades dos trechos (fluxo em 1 sentido)</option>
+          <option value="bi">No meio dos trechos (fluxo em 2 sentidos)</option>
+        </select></div>
+      <div><label for="saida">Tipo de saída da calha</label>
+        <select id="saida"><option value="aresta">Aresta viva</option><option value="funil">Com funil (bocal)</option></select></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Identificação (relatório)</h2>
+    <label for="obra">Obra / cliente</label><input id="obra" placeholder="ex.: Residência Silva">
+    <label for="resp">Responsável técnico</label><input id="resp" placeholder="nome / registro CREA">
+    <div class="btns">
+      <button id="btnCalc" disabled>Calcular</button>
+      <button id="btnExport" class="sec" disabled>Exportar relatório (HTML)</button>
+      <button id="btnPrint" class="sec" disabled>Imprimir / PDF</button>
+    </div>
+  </div>
+</section>
+
+<section id="out">
+  <div class="card" id="vazio">Preencha os dados e clique em <b>Calcular</b>.</div>
+  <div id="res"></div>
+</section>
+</main>
+<footer>
+  Ferramenta de apoio ao projeto. Os resultados devem ser verificados por profissional habilitado.
+  Motor de cálculo em Python executado localmente via Brython 3.12 (BSD-3-Clause, © Pierre Quentel).
+</footer>
+
+<script>
+/* ===================== Ponte JS <-> Python ===================== */
+let PY = false, ULTIMO = null;
+function api(nome, args){ const r = JSON.parse(window.pyApi(nome, JSON.stringify(args||{}))); if(!r.ok) throw new Error(r.erro); return r.r; }
+window.pyReady = function(){ PY = true; document.getElementById('status').textContent = 'Motor Python pronto'; init(); };
+const $ = id => document.getElementById(id);
+const fmt = (v, d=1) => (v===null||v===undefined||isNaN(v)) ? '—' : Number(v).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function init(){
+  const ufs = api('ufs');
+  $('uf').innerHTML = ufs.map(u => `<option value="${u.uf}">${u.uf} — ${esc(u.nome)}</option>`).join('');
+  $('uf').value = 'SP';
+  carregaCidades('São Paulo (Mirante de Santana)');
+  ['btnCalc','btnExport','btnPrint'].forEach(b => $(b).disabled = (b!=='btnCalc'));
+  $('btnCalc').disabled = false;
+  infoChuva();
+}
+function carregaCidades(sel){
+  const cs = api('cidades', {uf: $('uf').value});
+  $('cidade').innerHTML = cs.map(c => `<option value="${esc(c.nome)}">${esc(c.nome)}${c.posto?' ★':''}</option>`).join('');
+  if (sel && cs.some(c=>c.nome===sel)) $('cidade').value = sel;
+}
+function numOrNull(id){ const v = $(id).value.trim(); return v==='' ? null : parseFloat(v); }
+function infoChuva(){
+  try{
+    const c = api('chuva', {uf:$('uf').value, cidade:$('cidade').value, T:+$('T').value, lat:numOrNull('lat'), lon:numOrNull('lon'), I_manual:numOrNull('Iman')});
+    $('chuvaInfo').innerHTML = `Posto: <b>${esc(c.posto)}/${c.posto_uf}</b> (${fmt(c.dist_km,0)} km) · I<sub>T=${c.T}</sub> = <b>${fmt(c.I,0)} mm/h</b>${c.I_estimado?' (estimado)':''} · ★ = posto da NBR 10844`;
+  }catch(e){ $('chuvaInfo').textContent = e.message; }
+}
+function entrada(){
+  return {
+    uf:$('uf').value, cidade:$('cidade').value, T:+$('T').value,
+    lat:numOrNull('lat'), lon:numOrNull('lon'), I_manual:numOrNull('Iman'),
+    n_aguas:+$('naguas').value, a1:+$('a1').value, a2:+$('a2').value,
+    comprimento:+$('comp').value, inclinacao:+$('inc').value, parede:+$('parede').value||0,
+    forma:$('forma').value, material:$('material').value, declividade:+$('decl').value,
+    curva:$('curva').value, largura_chapa:+$('lchapa').value, comp_chapa:+$('cchapa').value,
+    aba:+$('aba').value, bainha:+$('bainha').value, sobre:+$('sobre').value,
+    otimizar: $('otim').value==='1', acresc_max:+$('acresc').value,
+    N:Math.max(1,parseInt($('N').value)||1), altura_condutor:+$('hcond').value,
+    fluxo:$('fluxo').value, saida:$('saida').value,
+    obra:$('obra').value, resp:$('resp').value
+  };
+}
+function validar(e){
+  const er=[];
+  if(!(e.a1>0)) er.push('Largura da água 1 deve ser > 0.');
+  if(e.n_aguas===2 && !(e.a2>0)) er.push('Largura da água 2 deve ser > 0.');
+  if(!(e.comprimento>0)) er.push('Comprimento deve ser > 0.');
+  if(!(e.inclinacao>=0)) er.push('Inclinação inválida.');
+  if(!(e.altura_condutor>0)) er.push('Altura do condutor deve ser > 0.');
+  if(!(e.largura_chapa>=200)) er.push('Largura da chapa inválida.');
+  return er;
+}
+function calcular(){
+  const e = entrada(); const er = validar(e);
+  if(er.length){ alert(er.join('\n')); return; }
+  try{
+    const t0 = performance.now();
+    const r = api('calc', e); r._e = e; r._ms = performance.now()-t0;
+    ULTIMO = r; render(r);
+    $('btnExport').disabled = $('btnPrint').disabled = false;
+  }catch(err){ alert('Erro no cálculo: '+err.message); console.error(err); }
+}
+
+/* ===================== Desenho do perfil (SVG) ===================== */
+function svgPerfil(r){
+  const g = r.geometria, c = r.calha, k = r.condutor;
+  // pontos para bounding box
+  const P = [];
+  g.segmentos.forEach(s => { if(s.tipo==='linha'){P.push(s.p0,s.p1);} else {P.push([s.cx-s.r,s.cy],[s.cx+s.r,s.cy],[s.cx,s.cy-s.r]);} });
+  const xs=P.map(p=>p[0]), ys=P.map(p=>p[1]);
+  let x0=Math.min(...xs), x1=Math.max(...xs), y0=Math.min(...ys), y1=Math.max(...ys);
+  const W = Math.max(x1-x0, y1-y0, 150);
+  const ts = W/24;                       // tamanho do texto
+  const tubeL = Math.max(1.6*k.DE, 0.45*W);
+  const yb = c.forma==='meiacana' ? 0 : 0;
+  y0 = Math.min(y0, yb - tubeL);
+  const pad = ts*5.2;
+  const padTop = pad + ts*2.5;
+  const vb = [x0-pad-ts*4, -(y1+padTop), (x1-x0)+2*pad+ts*12, (y1-y0)+pad+padTop];
+  const X = x => x, Y = y => -y;
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" class="drawing" viewBox="${vb.join(' ')}" font-family="Arial, sans-serif">`;
+  s += `<defs><marker id="ar" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="${ts*0.55}" markerHeight="${ts*0.55}" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0,1 L10,5 L0,9 z" fill="#0b5cad"/></marker>`;
+  s += `<pattern id="hat" width="${ts*0.6}" height="${ts*0.6}" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="${ts*0.6}" stroke="#8aa" stroke-width="${ts*0.06}"/></pattern></defs>`;
+  s += `<rect x="${vb[0]}" y="${vb[1]}" width="${vb[2]}" height="${vb[3]}" fill="#fff"/>`;
+  // água
+  const a = g.agua;
+  if(a.tipo==='ret'){
+    s += `<rect x="${X(a.x0)}" y="${Y(a.y)}" width="${a.x1-a.x0}" height="${a.y}" fill="#9cc9f0" opacity=".7"/>`;
+  }else{
+    const R = c.R_mm, cy = R; let pts=[];
+    for(let i=0;i<=60;i++){ const t=Math.PI+Math.PI*i/60; const px=R+R*Math.cos(t), py=cy+R*Math.sin(t); if(py<=a.y+1e-6) pts.push([px,py]); }
+    pts = [[a.x0,a.y],...pts,[a.x1,a.y]];
+    s += `<polygon points="${pts.map(p=>X(p[0])+','+Y(p[1])).join(' ')}" fill="#9cc9f0" opacity=".7"/>`;
+  }
+  s += `<line x1="${X(a.x0)}" y1="${Y(a.y)}" x2="${X(a.x1)}" y2="${Y(a.y)}" stroke="#2a7fc7" stroke-width="${ts*0.07}" stroke-dasharray="${ts*0.4} ${ts*0.25}"/>`;
+  // condutor (tubo)
+  const xt = g.x_tubo, DE = k.DE, DI = k.DI;
+  s += `<rect x="${X(xt-DE/2)}" y="${Y(0)}" width="${DE}" height="${tubeL}" fill="url(#hat)" stroke="none"/>`;
+  s += `<rect x="${X(xt-DI/2)}" y="${Y(0)}" width="${DI}" height="${tubeL}" fill="#fff" stroke="none"/>`;
+  [xt-DE/2, xt+DE/2].forEach(xx => s += `<line x1="${X(xx)}" y1="${Y(0)}" x2="${X(xx)}" y2="${Y(-tubeL)}" stroke="#555" stroke-width="${ts*0.1}"/>`);
+  [xt-DI/2, xt+DI/2].forEach(xx => s += `<line x1="${X(xx)}" y1="${Y(0)}" x2="${X(xx)}" y2="${Y(-tubeL)}" stroke="#555" stroke-width="${ts*0.05}"/>`);
+  s += `<line x1="${X(xt)}" y1="${Y(ts)}" x2="${X(xt)}" y2="${Y(-tubeL-ts)}" stroke="#999" stroke-width="${ts*0.04}" stroke-dasharray="${ts*0.8} ${ts*0.2} ${ts*0.15} ${ts*0.2}"/>`;
+  // seta de fluxo no tubo
+  s += `<line x1="${X(xt)}" y1="${Y(-tubeL*0.25)}" x2="${X(xt)}" y2="${Y(-tubeL*0.7)}" stroke="#2a7fc7" stroke-width="${ts*0.12}" marker-end="url(#ar)"/>`;
+  // cota do diâmetro
+  const yd = -tubeL + ts*1.2;
+  s += `<line x1="${X(xt-DE/2)}" y1="${Y(yd)}" x2="${X(xt+DE/2)}" y2="${Y(yd)}" stroke="#0b5cad" stroke-width="${ts*0.05}" marker-start="url(#ar)" marker-end="url(#ar)"/>`;
+  s += `<text x="${X(xt)}" y="${Y(yd)-ts*0.35}" font-size="${ts*0.75}" fill="#0b5cad" text-anchor="middle">Ø ${fmt(DE,0)}</text>`;
+  const lx = xt + DE/2 + ts*0.8;
+  s += `<text x="${X(lx)}" y="${Y(-tubeL*0.45)}" font-size="${ts}" fill="#222">Condutor PVC</text>`;
+  s += `<text x="${X(lx)}" y="${Y(-tubeL*0.45)+ts*1.2}" font-size="${ts}" fill="#222" font-weight="bold">Ø DN ${k.DN} mm</text>`;
+  s += `<text x="${X(lx)}" y="${Y(-tubeL*0.45)+ts*2.4}" font-size="${ts*0.8}" fill="#555">DE ${fmt(DE,0)} · DI≈${fmt(DI,0)} mm</text>`;
+  // perfil da chapa
+  const sw = ts*0.22;
+  g.segmentos.forEach(sg => {
+    if(sg.tipo==='linha'){
+      s += `<line x1="${X(sg.p0[0])}" y1="${Y(sg.p0[1])}" x2="${X(sg.p1[0])}" y2="${Y(sg.p1[1])}" stroke="#2b3a4a" stroke-width="${sw}" stroke-linecap="round"/>`;
+    }else{
+      let pts=[]; for(let i=0;i<=72;i++){ const t=Math.PI+Math.PI*i/72; pts.push([sg.cx+sg.r*Math.cos(t), sg.cy+sg.r*Math.sin(t)]); }
+      s += `<polyline points="${pts.map(p=>X(p[0])+','+Y(p[1])).join(' ')}" fill="none" stroke="#2b3a4a" stroke-width="${sw}" stroke-linejoin="round"/>`;
+    }
+  });
+  // cotas dos segmentos
+  const cx = g.centro[0], cyy = g.centro[1];
+  g.segmentos.forEach(sg => {
+    if(sg.tipo!=='linha') return;
+    const [ax,ay]=sg.p0, [bx,by]=sg.p1; const dx=bx-ax, dy=by-ay, L=Math.hypot(dx,dy); if(L<1e-6) return;
+    let nx=-dy/L, ny=dx/L; const mx=(ax+bx)/2, my=(ay+by)/2;
+    if(nx*(mx-cx)+ny*(my-cyy) < 0){ nx=-nx; ny=-ny; }
+    const off = ts*(L < 3*ts ? 1.4 : 2.0);
+    const p0=[ax+nx*off, ay+ny*off], p1=[bx+nx*off, by+ny*off];
+    s += `<line x1="${X(ax+nx*ts*0.3)}" y1="${Y(ay+ny*ts*0.3)}" x2="${X(p0[0]+nx*ts*0.3)}" y2="${Y(p0[1]+ny*ts*0.3)}" stroke="#0b5cad" stroke-width="${ts*0.035}"/>`;
+    s += `<line x1="${X(bx+nx*ts*0.3)}" y1="${Y(by+ny*ts*0.3)}" x2="${X(p1[0]+nx*ts*0.3)}" y2="${Y(p1[1]+ny*ts*0.3)}" stroke="#0b5cad" stroke-width="${ts*0.035}"/>`;
+    s += `<line x1="${X(p0[0])}" y1="${Y(p0[1])}" x2="${X(p1[0])}" y2="${Y(p1[1])}" stroke="#0b5cad" stroke-width="${ts*0.05}" marker-start="url(#ar)" marker-end="url(#ar)"/>`;
+    let ang = Math.atan2(-(by-ay), bx-ax)*180/Math.PI; if(ang>90) ang-=180; if(ang<-90) ang+=180;
+    const tx = (p0[0]+p1[0])/2 + nx*ts*0.55, ty = (p0[1]+p1[1])/2 + ny*ts*0.55;
+    s += `<text x="${X(tx)}" y="${Y(ty)}" font-size="${ts*0.85}" fill="#0b5cad" text-anchor="middle" dominant-baseline="middle" transform="rotate(${ang} ${X(tx)} ${Y(ty)})">${fmt(sg.comp,0)}</text>`;
+  });
+  // meia-cana: cota do diâmetro e raio
+  if(c.forma==='meiacana'){
+    const R=c.R_mm, yy=R+ts*2.6;
+    s += `<line x1="0" y1="${Y(yy)}" x2="${2*R}" y2="${Y(yy)}" stroke="#0b5cad" stroke-width="${ts*0.05}" marker-start="url(#ar)" marker-end="url(#ar)"/>`;
+    s += `<text x="${R}" y="${Y(yy)-ts*0.4}" font-size="${ts*0.85}" fill="#0b5cad" text-anchor="middle">Ø ${fmt(c.D_mm,1)} (R ${fmt(R,1)}) · arco ${fmt(Math.PI*R,0)}</text>`;
+    s += `<line x1="${R}" y1="${Y(R)}" x2="${R+R*Math.cos(-Math.PI/4)}" y2="${Y(R+R*Math.sin(-Math.PI/4))}" stroke="#0b5cad" stroke-width="${ts*0.04}" marker-end="url(#ar)"/>`;
+  }
+  // ângulos das dobras
+  g.dobras.forEach(d => {
+    const [px,py]=d.p, [bx,by]=d.bis, half = d.ang*Math.PI/360, rr = ts*1.1;
+    const rot = (x,y,t)=>[x*Math.cos(t)-y*Math.sin(t), x*Math.sin(t)+y*Math.cos(t)];
+    let pts=[]; for(let i=0;i<=12;i++){ const t=-half+2*half*i/12; const [ux,uy]=rot(bx,by,t); pts.push([px+ux*rr, py+uy*rr]); }
+    s += `<polyline points="${pts.map(p=>X(p[0])+','+Y(p[1])).join(' ')}" fill="none" stroke="#c0392b" stroke-width="${ts*0.05}"/>`;
+    const tx=px+bx*rr*2.1, ty=py+by*rr*2.1;
+    s += `<text x="${X(tx)}" y="${Y(ty)}" font-size="${ts*0.75}" fill="#c0392b" text-anchor="middle" dominant-baseline="middle">${fmt(d.ang,d.ang%1?1:0)}°</text>`;
+  });
+  // cota da lâmina
+  const xl = (c.forma==='meiacana') ? c.R_mm : (a.x0 + (a.x1-a.x0)*0.45);
+  const ybase = (c.forma==='meiacana') ? 0 : 0;
+  s += `<line x1="${X(xl)}" y1="${Y(ybase)}" x2="${X(xl)}" y2="${Y(a.y)}" stroke="#1d5f99" stroke-width="${ts*0.05}" marker-start="url(#ar)" marker-end="url(#ar)"/>`;
+  s += `<text x="${X(xl)+ts*0.3}" y="${Y(a.y/2)}" font-size="${ts*0.75}" fill="#1d5f99" dominant-baseline="middle">y = ${fmt(c.lamina_mm,1)}</text>`;
+  // legenda
+  const lyL = -(y0) + pad*0.7;
+  s += `<text x="${vb[0]+ts*0.6}" y="${vb[1]+ts*1.3}" font-size="${ts*0.95}" font-weight="bold" fill="#12324f">CORTE TRANSVERSAL — ${esc(c.forma_nome.toUpperCase())}</text>`;
+  s += `<text x="${vb[0]+ts*0.6}" y="${vb[1]+ts*2.5}" font-size="${ts*0.7}" fill="#555">Cotas em mm · ângulos internos das dobras em vermelho · lâmina d'água de projeto em azul</text>`;
+  s += `</svg>`;
+  return s;
+}
+
+/* ===================== Planificação / corte da chapa ===================== */
+function svgPlanificacao(r){
+  const c = r.calha, g = r.geometria;
+  if(!c.chapa || !c.dev_mm) return '';
+  const segs = g.segmentos.map(s => ({nome:s.nome, comp:s.comp}));
+  const total = segs.reduce((a,s)=>a+s.comp,0);
+  const W = 1000, H = 520, L = c.largura_chapa, sc = (W-80)/L, x0 = 40;
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" class="drawing" viewBox="0 0 ${W} ${H}" font-family="Arial, sans-serif"><rect width="${W}" height="${H}" fill="#fff"/>`;
+  s += `<text x="20" y="26" font-size="16" font-weight="bold" fill="#12324f">PLANIFICAÇÃO DA TIRA E CORTE DA CHAPA ${fmt(L,0)} mm</text>`;
+  // tira
+  const yT = 70, hT = 70, sT = (W-80)/c.dev_mm;
+  s += `<rect x="${x0}" y="${yT}" width="${c.dev_mm*sT}" height="${hT}" fill="#e7edf3" stroke="#2b3a4a" stroke-width="1.5"/>`;
+  let acc = 0;
+  segs.forEach((sg,i) => {
+    const xa = x0 + acc*sT, xb = x0 + (acc+sg.comp)*sT, xm = (xa+xb)/2;
+    s += `<text x="${xm}" y="${yT+hT/2+5}" font-size="${sg.comp*sT<46?10:13}" text-anchor="middle" fill="#0b5cad">${fmt(sg.comp,0)}</text>`;
+    s += `<text x="${xm}" y="${yT+hT+16}" font-size="10" text-anchor="middle" fill="#555" transform="rotate(30 ${xm} ${yT+hT+16})">${esc(sg.nome)}</text>`;
+    acc += sg.comp;
+    if(i < segs.length-1){
+      const xf = x0 + acc*sT, dob = g.dobras[i];
+      s += `<line x1="${xf}" y1="${yT-8}" x2="${xf}" y2="${yT+hT+4}" stroke="#c0392b" stroke-dasharray="6 4" stroke-width="1.3"/>`;
+      if(dob) s += `<text x="${xf}" y="${yT-12}" font-size="11" text-anchor="middle" fill="#c0392b">${fmt(dob.ang, dob.ang%1?1:0)}°</text>`;
+    }
+  });
+  s += `<text x="${x0}" y="${yT+hT+70}" font-size="13" fill="#222">Desenvolvimento total da tira: <tspan font-weight="bold">${fmt(c.dev_mm,0)} mm</tspan> (soma das dobras = ${fmt(total,1)} mm) · linhas tracejadas = eixos de dobra</text>`;
+  // chapa
+  const yC = 250, hC = 220, k = c.tiras_por_chapa;
+  s += `<rect x="${x0}" y="${yC}" width="${L*sc}" height="${hC}" fill="#fff" stroke="#2b3a4a" stroke-width="1.5"/>`;
+  for(let i=0;i<k;i++){
+    const xa = x0 + i*c.dev_mm*sc, w = c.dev_mm*sc;
+    s += `<rect x="${xa}" y="${yC}" width="${w}" height="${hC}" fill="${i%2?'#dbe8f5':'#c9ddf0'}" stroke="#0b5cad" stroke-width="1"/>`;
+    s += `<text x="${xa+w/2}" y="${yC+hC/2}" font-size="13" text-anchor="middle" fill="#0a3f78">Tira ${i+1}</text>`;
+    s += `<text x="${xa+w/2}" y="${yC+hC/2+18}" font-size="12" text-anchor="middle" fill="#0a3f78">${fmt(c.dev_mm,0)} mm</text>`;
+  }
+  const sobra = L - k*c.dev_mm;
+  if(sobra > 0.5){
+    const xa = x0 + k*c.dev_mm*sc;
+    s += `<rect x="${xa}" y="${yC}" width="${sobra*sc}" height="${hC}" fill="#f6d6d3" stroke="#b3261e"/>`;
+    s += `<text x="${xa+sobra*sc/2}" y="${yC+hC/2}" font-size="12" text-anchor="middle" fill="#b3261e">sobra ${fmt(sobra,0)}</text>`;
+  }
+  s += `<text x="${x0}" y="${yC-10}" font-size="13" fill="#222">Chapa ${fmt(L,0)} × ${fmt(r._e.comp_chapa,0)} mm → ${k} tira(s) · aproveitamento ${fmt(c.aproveitamento_pct,1)}%</text>`;
+  s += `</svg>`;
+  return s;
+}
+
+/* ===================== Saída na tela ===================== */
+function tabelaMateriais(r){
+  return `<table><tr><th>#</th><th>Descrição</th><th class="n">Qtd.</th><th>Un.</th><th>Observação</th></tr>` +
+    r.materiais.map((m,i)=>`<tr><td>${i+1}</td><td>${esc(m.item)}</td><td class="n">${fmt(m.qtd, Number.isInteger(m.qtd)?0:2)}</td><td>${m.un}</td><td>${esc(m.obs)}</td></tr>`).join('') + `</table>`;
+}
+function blocoChuva(r){
+  const c = r.chuva;
+  return `<table>
+  <tr><th>Estado / cidade</th><td>${esc(c.uf_nome)} (${c.uf}) — ${esc(c.cidade)}</td></tr>
+  <tr><th>Coordenadas</th><td>${fmt(c.lat,4)}, ${fmt(c.lon,4)}</td></tr>
+  <tr><th>Posto pluviográfico de referência</th><td>${esc(c.posto)}/${c.posto_uf} — distância ${fmt(c.dist_km,1)} km — ${c.anos_obs} anos de observação</td></tr>
+  <tr><th>Duração da chuva</th><td>${c.duracao_min} min (NBR 10844)</td></tr>
+  <tr><th>Intensidades do posto (t = 5 min)</th><td>T=1: <b>${c.I1}</b> · T=5: <b>${c.I5}</b> · T=25: <b>${c.I25===null?'n/d':c.I25}</b> mm/h</td></tr>
+  <tr><th>Período de retorno adotado</th><td>T = ${c.T} ano(s)</td></tr>
+  <tr><th>Intensidade de projeto I</th><td><b>${fmt(c.I,1)} mm/h</b> ${c.I_estimado?'(extrapolada)':''} — ${esc(c.fonte)}</td></tr>
+  <tr><th>Equivalências</th><td>${fmt(c.i_Lmin_m2,4)} L/min·m² · ${fmt(c.i_Ls_m2,5)} L/s·m² · altura precipitada em 5 min: ${fmt(c.altura_5min_mm,2)} mm</td></tr>
+  </table>
+  <h3>Postos mais próximos</h3>
+  <table><tr><th>Posto</th><th class="n">Dist. (km)</th><th class="n">T=1</th><th class="n">T=5</th><th class="n">T=25</th><th class="n">Anos</th></tr>
+  ${c.vizinhos.map(v=>`<tr><td>${esc(v.posto)}/${v.uf}</td><td class="n">${fmt(v.dist_km,1)}</td><td class="n">${v.I1}</td><td class="n">${v.I5}</td><td class="n">${v.I25===null?'n/d':v.I25}</td><td class="n">${v.anos}</td></tr>`).join('')}</table>`;
+}
+function blocoArea(r){
+  const a = r.area, v = r.vazao;
+  return `<table><tr><th>Água</th><th class="n">a (m)</th><th class="n">h (m)</th><th class="n">b (m)</th><th class="n">Projeção (m²)</th><th class="n">A = (a+h/2)·b (m²)</th></tr>
+  ${a.aguas.map((g,i)=>`<tr><td>${i+1}</td><td class="n">${fmt(g.a,2)}</td><td class="n">${fmt(g.h,3)}</td><td class="n">${fmt(g.b,2)}</td><td class="n">${fmt(g.A_proj,2)}</td><td class="n">${fmt(g.A,2)}</td></tr>`).join('')}
+  <tr><td colspan="5">Parede vertical (50%)</td><td class="n">${fmt(a.A_parede,2)}</td></tr>
+  <tr><th colspan="5">Área de contribuição total</th><th class="n">${fmt(a.A_total,2)}</th></tr></table>
+  <h3>Vazões</h3>
+  <table>
+  <tr><th>Vazão de projeto Q = I·A/60</th><td class="n"><b>${fmt(v.Q_total_Lmin,1)} L/min</b> (${fmt(v.Q_total_Ls,3)} L/s)</td></tr>
+  <tr><th>Trechos de calha (${v.sentido==='uni'?'fluxo em 1 sentido':'fluxo em 2 sentidos'})</th><td class="n">${v.trechos}</td></tr>
+  <tr><th>Vazão por trecho</th><td class="n">${fmt(v.Q_trecho_Lmin,1)} L/min</td></tr>
+  <tr><th>Coeficiente de curvas (${esc(v.coef_desc)})</th><td class="n">× ${fmt(v.coef_curva,2)}</td></tr>
+  <tr><th>Vazão de dimensionamento da calha</th><td class="n"><b>${fmt(v.Q_calha_Lmin,1)} L/min</b></td></tr></table>`;
+}
+function blocoCalha(r){
+  const c = r.calha;
+  const dims = c.forma==='meiacana'
+    ? `<tr><th>Diâmetro interno D</th><td class="n"><b>${fmt(c.D_mm,1)} mm</b> (R = ${fmt(c.R_mm,1)} mm; mínimo hidráulico ${fmt(c.D_hidraulico_mm,0)} mm)</td></tr>
+       <tr><th>Altura útil (D/2)</th><td class="n">${fmt(c.altura_mm,1)} mm</td></tr>`
+    : `<tr><th>Largura interna (fundo) b</th><td class="n"><b>${fmt(c.b_mm,0)} mm</b> (mínimo hidráulico ${fmt(c.b_hidraulico_mm,0)})</td></tr>
+       <tr><th>Altura H${c.forma==='beiral'?' (frontal)':''}</th><td class="n"><b>${fmt(c.H_mm,0)} mm</b> (mínimo ${fmt(c.H_hidraulico_mm,0)})</td></tr>
+       ${c.H_traseira_mm?`<tr><th>Altura traseira</th><td class="n">${fmt(c.H_traseira_mm,0)} mm</td></tr>`:''}`;
+  return `<table>
+  <tr><th>Formato / material</th><td class="n">${esc(c.forma_nome)} — ${esc(c.material)}</td></tr>
+  ${dims}
+  <tr><th>Lâmina d'água de projeto y</th><td class="n"><b>${fmt(c.lamina_mm,1)} mm</b> (máx. admitida ${fmt(c.lamina_max_mm,1)} mm)</td></tr>
+  <tr><th>Borda livre</th><td class="n">${fmt(c.borda_livre_mm,1)} mm · ocupação ${fmt(c.ocupacao_pct,1)}%</td></tr>
+  <tr><th>Coef. de rugosidade n · declividade</th><td class="n">${fmt(c.n,3)} · ${fmt(c.S*100,2)} %</td></tr>
+  <tr><th>Área molhada · perímetro · Rh</th><td class="n">${fmt(c.area_molhada_cm2,1)} cm² · ${fmt(c.perimetro_molhado_mm,1)} mm · ${fmt(c.raio_hidraulico_mm,2)} mm</td></tr>
+  <tr><th>Velocidade · nº de Froude</th><td class="n">${fmt(c.velocidade_ms,2)} m/s · ${fmt(c.froude,2)}</td></tr>
+  <tr><th>Capacidade com lâmina máxima</th><td class="n">${fmt(c.Q_admissivel,1)} L/min · utilização <span class="${c.utilizacao_pct<=100?'ok':'bad'}">${fmt(c.utilizacao_pct,1)}%</span></td></tr>
+  ${c.chapa?`<tr><th>Desenvolvimento da chapa</th><td class="n"><b>${fmt(c.dev_mm,0)} mm</b> (mínimo ${fmt(c.dev_min_mm,0)} mm) · ${c.tiras_por_chapa} tira(s) por chapa de ${fmt(c.largura_chapa,0)} mm · aproveitamento ${fmt(c.aproveitamento_pct,1)}%</td></tr>`:''}
+  </table>
+  <h3>Dobras (sequência de corte)</h3>
+  <table><tr><th>#</th><th>Trecho</th><th class="n">Medida (mm)</th><th class="n">Ângulo da dobra seguinte</th></tr>
+  ${r.geometria.segmentos.map((s,i)=>`<tr><td>${i+1}</td><td>${esc(s.nome)}</td><td class="n">${fmt(s.comp,1)}</td><td class="n">${r.geometria.dobras[i]?fmt(r.geometria.dobras[i].ang,1)+'°':'—'}</td></tr>`).join('')}
+  </table>`;
+}
+function blocoCondutor(r){
+  const k = r.condutor;
+  return `<table>
+  <tr><th>Quantidade de descidas</th><td class="n"><b>${k.N}</b></td></tr>
+  <tr><th>Vazão por condutor</th><td class="n">${fmt(k.Q_por_condutor,1)} L/min</td></tr>
+  <tr><th>Diâmetro adotado (PVC NBR 5688)</th><td class="n"><b>DN ${k.DN}</b> (DE ${fmt(k.DE,0)} · DI≈${fmt(k.DI,0)} mm) — mínimo normativo 70 mm</td></tr>
+  <tr><th>Saída da calha · carga no bocal (H)</th><td class="n">${k.saida==='funil'?'com funil':'aresta viva'} · ${fmt(k.H_bocal_mm,1)} mm</td></tr>
+  <tr><th>Capacidade (entrada / tubo de queda)</th><td class="n">${fmt(k.Q_entrada,1)} / ${fmt(k.Q_tubo,1)} L/min → ${fmt(k.Q_cap,1)} L/min (${esc(k.regime)})</td></tr>
+  <tr><th>Utilização</th><td class="n"><span class="${k.utilizacao_pct<=100?'ok':'bad'}">${fmt(k.utilizacao_pct,1)}%</span></td></tr>
+  <tr><th>Nº mínimo de descidas com DN 100</th><td class="n">${k.N_min_DN100}</td></tr>
+  </table>
+  <h3>Diâmetros comerciais verificados</h3>
+  <table><tr><th>DN</th><th class="n">DI (mm)</th><th class="n">Q entrada</th><th class="n">Q tubo</th><th class="n">Capacidade (L/min)</th><th>Atende?</th></tr>
+  ${k.tabela.map(t=>`<tr><td>DN ${t.DN}</td><td class="n">${fmt(t.DI,0)}</td><td class="n">${fmt(t.Q_entrada,0)}</td><td class="n">${fmt(t.Q_tubo,0)}</td><td class="n">${fmt(t.Q_cap,0)}</td><td class="${t.ok?'ok':'bad'}">${t.ok?'sim':'não'}</td></tr>`).join('')}</table>`;
+}
+function memoria(r){
+  const c=r.chuva,a=r.area,v=r.vazao,k=r.calha,d=r.condutor;
+  let m = `MEMÓRIA DE CÁLCULO\n`;
+  m += `1) Intensidade: I(T=${c.T}, t=5 min) = ${fmt(c.I,1)} mm/h  [${c.fonte}; posto ${c.posto}]\n`;
+  a.aguas.forEach((g,i)=>{ m += `2.${i+1}) Água ${i+1}: h = a·i = ${fmt(g.a,2)}×${fmt(r._e.inclinacao/100,3)} = ${fmt(g.h,3)} m;  A = (a + h/2)·b = (${fmt(g.a,2)} + ${fmt(g.h/2,3)})×${fmt(g.b,2)} = ${fmt(g.A,3)} m²\n`; });
+  if(a.A_parede>0) m += `    Parede vertical: A = ${fmt(a.A_parede*2,2)}/2 = ${fmt(a.A_parede,2)} m²\n`;
+  m += `3) Q = I·A/60 = ${fmt(c.I,1)}×${fmt(a.A_total,3)}/60 = ${fmt(v.Q_total_Lmin,1)} L/min\n`;
+  m += `4) Q calha = Q/${v.trechos} × ${fmt(v.coef_curva,2)} = ${fmt(v.Q_calha_Lmin,1)} L/min\n`;
+  m += `5) Manning-Strickler: Q = 60000·(S/n)·Rh^(2/3)·i^(1/2);  n = ${k.n}, i = ${fmt(k.S,4)} m/m\n`;
+  m += k.forma==='meiacana'
+     ? `   Seção semicircular D = ${fmt(k.D_mm,1)} mm; lâmina máx. = D/2 (NBR 10844, Tabela 2)\n`
+     : `   Seção retangular de máxima eficiência (y = b/2); lâmina máx. = 2/3·H\n   b = ${fmt(k.b_mm,0)} mm; H = ${fmt(k.H_mm,0)} mm\n`;
+  m += `   y = ${fmt(k.lamina_mm,1)} mm → S = ${fmt(k.area_molhada_cm2,1)} cm², Rh = ${fmt(k.raio_hidraulico_mm,2)} mm, V = ${fmt(k.velocidade_ms,2)} m/s\n`;
+  m += `   Capacidade com y máx. = ${fmt(k.Q_admissivel,1)} L/min ≥ ${fmt(k.Qc,1)} L/min  ${k.Q_admissivel>=k.Qc?'OK':'NÃO ATENDE'}\n`;
+  if(k.chapa) m += `6) Chapa: desenvolvimento mínimo ${fmt(k.dev_min_mm,0)} mm → adotado ${fmt(k.dev_mm,0)} mm = ${fmt(k.largura_chapa,0)}/${k.tiras_por_chapa||'—'}\n`;
+  m += `7) Condutor: Q/N = ${fmt(d.Q_por_condutor,1)} L/min; H = ${fmt(d.H_bocal_mm,1)} mm\n`;
+  m += `   Entrada = min(vertedouro 0,62·(2/3)·√(2g)·πD·H^1,5 ; orifício Cd·πD²/4·√(2gH))\n`;
+  m += `   Tubo de queda (Wyly-Eaton, ocupação 1/3): Q[L/s] = 3,142e-4·(1/3)^(5/3)·D^(8/3)\n`;
+  m += `   DN ${d.DN}: capacidade ${fmt(d.Q_cap,1)} L/min ≥ ${fmt(d.Q_por_condutor,1)} L/min  ${d.Q_cap>=d.Q_por_condutor?'OK':'NÃO ATENDE'}\n`;
+  return m;
+}
+function blocoAvisos(r){
+  let h = r.avisos.map(a=>`<div class="warn">${esc(a)}</div>`).join('');
+  if(r.nota_150) h += `<div class="warn">${esc(r.nota_150)}</div>`;
+  return h;
+}
+function render(r){
+  $('vazio').style.display='none';
+  const c=r.calha,k=r.condutor,v=r.vazao;
+  const dimTxt = c.forma==='meiacana' ? `Ø ${fmt(c.D_mm,0)}` : `${fmt(c.b_mm,0)} × ${fmt(c.H_mm,0)}`;
+  $('res').innerHTML = `
+  <div class="card"><h2>Resumo</h2>
+    <div class="kpis">
+      <div class="kpi"><div class="v">${fmt(r.chuva.I,0)} mm/h</div><div class="l">Intensidade (T=${r.chuva.T}, 5 min)</div></div>
+      <div class="kpi"><div class="v">${fmt(r.area.A_total,1)} m²</div><div class="l">Área de contribuição</div></div>
+      <div class="kpi"><div class="v">${fmt(v.Q_total_Lmin,0)} L/min</div><div class="l">Vazão de projeto (${fmt(v.Q_total_Ls,2)} L/s)</div></div>
+      <div class="kpi"><div class="v">${dimTxt} mm</div><div class="l">Calha (${c.forma==='meiacana'?'diâmetro':'largura × altura'})</div></div>
+      <div class="kpi"><div class="v">${fmt(c.lamina_mm,0)} mm</div><div class="l">Lâmina d'água</div></div>
+      ${c.chapa?`<div class="kpi"><div class="v">${fmt(c.dev_mm,0)} mm</div><div class="l">Tira (${c.tiras_por_chapa}× por chapa ${fmt(c.largura_chapa,0)})</div></div>`:''}
+      <div class="kpi"><div class="v">${k.N} × DN ${k.DN}</div><div class="l">Condutores PVC</div></div>
+    </div>
+    ${blocoAvisos(r)}
+  </div>
+  <div class="card"><h2>Desenho da calha em corte</h2>${svgPerfil(r)}</div>
+  ${c.chapa?`<div class="card"><h2>Planificação e corte</h2>${svgPlanificacao(r)}</div>`:''}
+  <div class="grid2">
+    <div class="card"><h2>Dados pluviométricos</h2>${blocoChuva(r)}</div>
+    <div class="card"><h2>Área de contribuição e vazão</h2>${blocoArea(r)}</div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h2>Dimensionamento da calha</h2>${blocoCalha(r)}</div>
+    <div class="card"><h2>Condutores verticais</h2>${blocoCondutor(r)}</div>
+  </div>
+  <div class="card"><h2>Lista de materiais</h2>${tabelaMateriais(r)}</div>
+  <div class="card"><h2>Memória de cálculo</h2><div class="mem">${esc(memoria(r))}</div>
+    <div class="hint">Cálculo executado em ${fmt(r._ms,0)} ms pelo motor Python (${esc(r.motor)}).</div></div>`;
+}
+
+/* ===================== Relatório exportável ===================== */
+function relatorioHTML(r){
+  const e=r._e, a=r.area, c=r.calha;
+  const data = new Date().toLocaleString('pt-BR');
+  const css = `body{font:12px/1.45 Arial,sans-serif;color:#1b2430;margin:24px auto;max-width:960px;padding:0 16px;background:#fff}
+  h1{font-size:20px;color:#12324f;margin:0}h2{font-size:14px;color:#0b5cad;border-bottom:2px solid #0b5cad;padding-bottom:3px;margin:22px 0 8px;text-transform:uppercase}
+  h3{font-size:13px;margin:12px 0 4px}table{border-collapse:collapse;width:100%;margin:4px 0}th,td{border:1px solid #cfd6df;padding:4px 6px;text-align:left;vertical-align:top}
+  th{background:#eef2f7}td.n{text-align:right}.ok{color:#1f7a3d;font-weight:bold}.bad{color:#b3261e;font-weight:bold}
+  .warn{background:#fff6e5;border-left:4px solid #9a5b00;padding:6px 8px;margin:4px 0}.mem{font-family:Consolas,monospace;font-size:11px;white-space:pre-wrap;background:#f7f9fb;border:1px solid #cfd6df;padding:8px}
+  .drawing{width:100%;border:1px solid #cfd6df}.cab{display:flex;justify-content:space-between;border-bottom:3px solid #12324f;padding-bottom:8px}
+  .ref{font-size:11px;color:#555}@media print{h2{break-after:avoid}.pg{break-before:page}}`;
+  const ident = `<table>
+    <tr><th>Obra / cliente</th><td>${esc(e.obra||'—')}</td><th>Responsável</th><td>${esc(e.resp||'—')}</td></tr>
+    <tr><th>Local</th><td>${esc(r.chuva.cidade)} — ${esc(r.chuva.uf_nome)} (${r.chuva.uf})</td><th>Data</th><td>${data}</td></tr></table>`;
+  const tel = `<table>
+    <tr><th>Águas na calha</th><td>${e.n_aguas}</td><th>Comprimento (b)</th><td>${fmt(e.comprimento,2)} m</td></tr>
+    <tr><th>Largura água 1 (a₁)</th><td>${fmt(e.a1,2)} m</td><th>Largura água 2 (a₂)</th><td>${e.n_aguas===2?fmt(e.a2,2)+' m':'—'}</td></tr>
+    <tr><th>Inclinação</th><td>${fmt(e.inclinacao,1)} % (${fmt(a.ang_telhado_graus,1)}°)</td><th>Área projetada</th><td>${fmt(a.aguas.reduce((s,g)=>s+g.A_proj,0),2)} m²</td></tr>
+    <tr><th>Formato da calha</th><td>${esc(c.forma_nome)}</td><th>Material</th><td>${esc(c.material)}</td></tr>
+    <tr><th>Declividade da calha</th><td>${fmt(e.declividade,2)} %</td><th>Descidas</th><td>${e.N} (${e.fluxo==='uni'?'extremidades dos trechos':'meio dos trechos'}) · altura ${fmt(e.altura_condutor,2)} m</td></tr></table>`;
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Relatório de calhas — ${esc(r.chuva.cidade)}</title><style>${css}</style></head><body>
+  <div class="cab"><div><h1>Memorial de Cálculo — Calhas e Condutores Pluviais</h1><div class="ref">ABNT NBR 10844:1989 · Manning-Strickler · PVC NBR 5688</div></div><div class="ref" style="text-align:right">${data}</div></div>
+  <h2>1. Identificação</h2>${ident}
+  <h2>2. Dados da cobertura</h2>${tel}
+  <h2>3. Dados pluviométricos</h2>${blocoChuva(r)}
+  <h2>4. Área de contribuição e vazão de projeto</h2>${blocoArea(r)}
+  <h2>5. Dimensionamento da calha</h2>${blocoCalha(r)}
+  <h2 class="pg">6. Desenho da calha em corte</h2>${svgPerfil(r)}
+  ${c.chapa?`<h2>7. Planificação e plano de corte da chapa</h2>${svgPlanificacao(r)}`:''}
+  <h2>8. Condutores verticais de descida</h2>${blocoCondutor(r)}
+  <h2>9. Lista de materiais</h2>${tabelaMateriais(r)}
+  <h2>10. Observações e avisos</h2>${blocoAvisos(r)||'<p>Sem avisos.</p>'}
+  <h2>11. Memória de cálculo</h2><div class="mem">${esc(memoria(r))}</div>
+  <h2>12. Referências e critérios</h2>
+  <ul class="ref">
+   <li>ABNT NBR 10844:1989 — Instalações prediais de águas pluviais: duração de 5 min; T = 1, 5 ou 25 anos; A = (a + h/2)·b; Q = I·A/60; Manning-Strickler com K = 60 000; declividade mínima das calhas 0,5 %; coeficientes de rugosidade; coeficientes multiplicativos para curvas; condutor vertical com diâmetro interno mínimo de 70 mm.</li>
+   <li>Intensidades: NBR 10844:1989, Tabela 5 (Pfafstetter, <i>Chuvas Intensas no Brasil</i>, 1957), posto mais próximo da cidade. Quando houver equação IDF local atualizada, recomenda-se adotá-la (campo de intensidade manual).</li>
+   <li>Condutores: a NBR 10844 dimensiona os condutores verticais pelos ábacos da Figura 3 (Q, H, L). Este programa usa um método analítico equivalente e conservador (controle de entrada por vertedouro/orifício e capacidade do tubo de queda com ocupação de 1/3). Recomenda-se conferir com os ábacos.</li>
+   <li>Lâmina máxima em calhas retangulares adotada em 2/3 da altura (borda livre de 1/3), critério de projeto; meia-cana com lâmina D/2, conforme Tabela 2 da NBR 10844.</li>
+   <li>Tubos de PVC-U: ABNT NBR 5688 (sistemas prediais de água pluvial, esgoto sanitário e ventilação). DI de cálculo de referência; conferir o catálogo do fabricante.</li>
+   <li>Espessura de chapa, espaçamento de suportes e acessórios: recomendações usuais de mercado, a confirmar com o fabricante/instalador.</li>
+  </ul>
+  <p class="ref">Documento gerado pela Calculadora de Calhas (motor de cálculo em Python). Os resultados devem ser verificados e assumidos por profissional legalmente habilitado.</p>
+  </body></html>`;
+}
+function exportar(){
+  if(!ULTIMO) return;
+  const html = relatorioHTML(ULTIMO);
+  const blob = new Blob([html], {type:'text/html;charset=utf-8'});
+  const a = document.createElement('a');
+  const nome = ('Relatorio_Calha_' + ULTIMO.chuva.cidade).normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9_]+/g,'_');
+  a.href = URL.createObjectURL(blob); a.download = nome + '.html';
+  document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();}, 500);
+}
+function imprimir(){
+  if(!ULTIMO) return;
+  const w = window.open('', '_blank');
+  if(!w){ alert('Permita pop-ups para imprimir o relatório.'); return; }
+  w.document.write(relatorioHTML(ULTIMO)); w.document.close();
+  setTimeout(()=>w.print(), 400);
+}
+
+/* ===================== Eventos ===================== */
+$('uf').addEventListener('change', ()=>{ carregaCidades(); infoChuva(); });
+['cidade','T','lat','lon','Iman'].forEach(id => $(id).addEventListener('change', infoChuva));
+$('naguas').addEventListener('change', ()=>{ $('a2').disabled = $('naguas').value==='1'; if($('naguas').value==='2' && $('forma').value==='beiral') $('forma').value='central'; });
+$('forma').addEventListener('change', ()=>{ if($('forma').value==='central'){ $('naguas').value='2'; $('a2').disabled=false; } });
+$('material').addEventListener('change', ()=>{ const ch=['galvanizada','aluminio','cobre','inox'].includes($('material').value); $('detChapa').style.display = ch?'':'none'; });
+$('btnCalc').addEventListener('click', calcular);
+$('btnExport').addEventListener('click', exportar);
+$('btnPrint').addEventListener('click', imprimir);
+</script>
+
+<!-- ===================== MOTOR DE CÁLCULO EM PYTHON ===================== -->
+<script type="text/python" id="motor">
+{{PYTHON}}
+</script>
+
+<!-- Brython {{BRYVER}} (BSD-3-Clause) embutido para funcionamento offline -->
+<script>
+/* script embutido: informa ao Brython o caminho base (nao ha arquivo brython.js externo) */
+globalThis.__BRYTHON__ = { brython_path: (location.href.split('#')[0].split('?')[0].replace(/[^/]*$/, '') || 'file:///') };
+</script>
+<script>
+{{BRYTHON}}
+</script>
+<script>
+try{ brython({debug:1}); }catch(err){ document.getElementById('status').textContent='Falha ao iniciar o Python: '+err; }
+</script>
+</body>
+</html>
